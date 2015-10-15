@@ -47,6 +47,7 @@ import org.everit.authnr.permissionchecker.UnauthorizedException;
 import org.everit.authorization.PermissionChecker;
 import org.everit.authorization.ri.schema.qdsl.QPermission;
 import org.everit.authorization.ri.schema.qdsl.QPermissionInheritance;
+import org.everit.osgi.dev.testrunner.TestDuringDevelopment;
 import org.everit.osgi.dev.testrunner.TestRunnerConstants;
 import org.everit.osgi.ecm.annotation.Component;
 import org.everit.osgi.ecm.annotation.ConfigurationPolicy;
@@ -55,7 +56,7 @@ import org.everit.osgi.ecm.annotation.Service;
 import org.everit.osgi.ecm.annotation.ServiceRef;
 import org.everit.osgi.ecm.annotation.attribute.StringAttribute;
 import org.everit.osgi.ecm.annotation.attribute.StringAttributes;
-import org.everit.osgi.ecm.component.ComponentContext;
+import org.everit.osgi.ecm.component.ServiceHolder;
 import org.everit.osgi.ecm.extender.ECMExtenderConstants;
 import org.everit.persistence.querydsl.support.QuerydslSupport;
 import org.everit.props.PropertyManager;
@@ -75,6 +76,9 @@ import com.mysema.query.sql.dml.SQLDeleteClause;
 
 import aQute.bnd.annotation.headers.ProvideCapability;
 
+/**
+ * Tests for the audit-ri and ECM components.
+ */
 @Component(configurationPolicy = ConfigurationPolicy.OPTIONAL)
 @ProvideCapability(ns = ECMExtenderConstants.CAPABILITY_NS_COMPONENT,
     value = ECMExtenderConstants.CAPABILITY_ATTR_CLASS + "=${@class}")
@@ -84,19 +88,34 @@ import aQute.bnd.annotation.headers.ProvideCapability;
     @StringAttribute(attributeId = TestRunnerConstants.SERVICE_PROPERTY_TEST_ID,
         defaultValue = "AuthorizationBasicTest") })
 @Service(AuditComponentTest.class)
+@TestDuringDevelopment
 public class AuditComponentTest {
+
+  private static final int EXPECTED_EVENT_DATA_LIST_SIZE = 4;
+
+  private static final int HUNDRED = 100;
+
+  private static final int NUMBER_INDEX = 2;
 
   private static final String NUMBER_N = "number";
 
   private static final double NUMBER_V = 10.75;
 
+  private static final int STRING_INDEX = 0;
+
   private static final String STRING_N = "string";
 
   private static final String STRING_V = "string-value";
 
+  private static final int TEN_THOUSAND = 10000;
+
+  private static final int TEXT_INDEX = 1;
+
   private static final String TEXT_N = "text";
 
   private static final String TEXT_V = "text-value";
+
+  private static final int TIMESTAMP_INDEX = 3;
 
   private static final String TIMESTAMP_N = "timestamp";
 
@@ -134,6 +153,9 @@ public class AuditComponentTest {
 
   private ResourceService resourceService;
 
+  /**
+   * Cleans up the database and caches after a test.
+   */
   @After
   public void after() {
     clearAllAuditEventTypes();
@@ -221,21 +243,23 @@ public class AuditComponentTest {
             Instant timestampValue = tuple.get(qEventData.timestampValue).toInstant();
             rval.add(eventDataBuilder.buildTimestampValue(timestampValue));
             break;
+          default:
+            throw new IllegalStateException("unsupported eventDataType [" + eventDataType + "]");
         }
       }
 
       return rval;
     });
 
-    Assert.assertEquals(4, eventDataList.size());
+    Assert.assertEquals(EXPECTED_EVENT_DATA_LIST_SIZE, eventDataList.size());
     Assert.assertEquals(new EventData.Builder(STRING_N).buildStringValue(STRING_V),
-        eventDataList.get(0));
+        eventDataList.get(STRING_INDEX));
     Assert.assertEquals(new EventData.Builder(TEXT_N).buildTextValue(false, TEXT_V),
-        eventDataList.get(1));
+        eventDataList.get(TEXT_INDEX));
     Assert.assertEquals(new EventData.Builder(NUMBER_N).buildNumberValue(NUMBER_V),
-        eventDataList.get(2));
+        eventDataList.get(NUMBER_INDEX));
     Assert.assertEquals(new EventData.Builder(TIMESTAMP_N).buildTimestampValue(TIMESTAMP_V),
-        eventDataList.get(3));
+        eventDataList.get(TIMESTAMP_INDEX));
   }
 
   @Before
@@ -342,6 +366,9 @@ public class AuditComponentTest {
         .build();
   }
 
+  /**
+   * Clears the database and the caches.
+   */
   @Deactivate
   public void deactivate() {
     querydslSupport.execute((connection, configuration) -> {
@@ -379,11 +406,14 @@ public class AuditComponentTest {
     this.auditEventTypeCache = auditEventTypeCache;
   }
 
+  /**
+   * Sets the {@link #auditEventTypeManager} and the {@link #embeddedAuditApplicationName}.
+   */
   @ServiceRef(defaultValue = "")
   public void setAuditEventTypeManager(
-      final ComponentContext<AuditEventTypeManager> auditEventTypeManagerContext) {
-    auditEventTypeManager = auditEventTypeManagerContext.getInstance();
-    embeddedAuditApplicationName = (String) auditEventTypeManagerContext.getProperties().get(
+      final ServiceHolder<AuditEventTypeManager> serviceHolder) {
+    auditEventTypeManager = serviceHolder.getService();
+    embeddedAuditApplicationName = (String) serviceHolder.getReference().getProperty(
         AuditRiComponentConstants.ATTR_EMBEDDED_AUDIT_APPLICATION_NAME);
   }
 
@@ -556,7 +586,7 @@ public class AuditComponentTest {
   @Test
   public void testInitAuditEventTypesStress() {
 
-    int count = 10000;
+    int count = TEN_THOUSAND;
     String[] eventTypeNames = new String[count];
     for (int i = 0; i < count; i++) {
       eventTypeNames[i] = "e" + i;
@@ -806,8 +836,8 @@ public class AuditComponentTest {
   @Test
   public void testLogEventStress() {
 
-    int eventTypeCount = 100;
-    int eventsPerEventType = 100;
+    int eventTypeCount = HUNDRED;
+    int eventsPerEventType = HUNDRED;
 
     String[] eventTypeNames = new String[eventTypeCount];
     List<AuditEvent> auditEvents = new ArrayList<>();
