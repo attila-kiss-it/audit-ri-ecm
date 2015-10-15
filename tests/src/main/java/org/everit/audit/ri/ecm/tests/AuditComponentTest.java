@@ -22,44 +22,46 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.apache.felix.scr.annotations.Component;
-import org.apache.felix.scr.annotations.ConfigurationPolicy;
-import org.apache.felix.scr.annotations.Deactivate;
-import org.apache.felix.scr.annotations.Properties;
-import org.apache.felix.scr.annotations.Property;
-import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.Service;
-import org.everit.osgi.audit.AuditEventTypeManager;
-import org.everit.osgi.audit.LoggingService;
-import org.everit.osgi.audit.dto.AuditEvent;
-import org.everit.osgi.audit.dto.EventData;
-import org.everit.osgi.audit.dto.EventData.Builder;
-import org.everit.osgi.audit.dto.EventDataType;
-import org.everit.osgi.audit.ri.AuditApplicationManager;
-import org.everit.osgi.audit.ri.AuditRiComponentConstants;
-import org.everit.osgi.audit.ri.InternalAuditEventTypeManager;
-import org.everit.osgi.audit.ri.InternalLoggingService;
-import org.everit.osgi.audit.ri.UnknownAuditApplicationException;
-import org.everit.osgi.audit.ri.authorization.AuditRiAuthorizationManager;
-import org.everit.osgi.audit.ri.authorization.AuditRiPermissionChecker;
-import org.everit.osgi.audit.ri.authorization.AuditRiPermissionConstants;
-import org.everit.osgi.audit.ri.dto.AuditApplication;
-import org.everit.osgi.audit.ri.props.AuditRiPropertyConstants;
-import org.everit.osgi.audit.ri.schema.qdsl.QApplication;
-import org.everit.osgi.audit.ri.schema.qdsl.QEvent;
-import org.everit.osgi.audit.ri.schema.qdsl.QEventData;
-import org.everit.osgi.audit.ri.schema.qdsl.QEventType;
-import org.everit.osgi.authentication.context.AuthenticationPropagator;
-import org.everit.osgi.authnr.permissionchecker.UnauthorizedException;
-import org.everit.osgi.authorization.PermissionChecker;
-import org.everit.osgi.authorization.ri.schema.qdsl.QPermission;
-import org.everit.osgi.authorization.ri.schema.qdsl.QPermissionInheritance;
+import org.everit.audit.AuditEventTypeManager;
+import org.everit.audit.LoggingService;
+import org.everit.audit.dto.AuditEvent;
+import org.everit.audit.dto.EventData;
+import org.everit.audit.dto.EventData.Builder;
+import org.everit.audit.dto.EventDataType;
+import org.everit.audit.ri.AuditApplicationManager;
+import org.everit.audit.ri.InternalAuditEventTypeManager;
+import org.everit.audit.ri.InternalLoggingService;
+import org.everit.audit.ri.UnknownAuditApplicationException;
+import org.everit.audit.ri.authorization.AuditRiAuthorizationManager;
+import org.everit.audit.ri.authorization.AuditRiPermissionChecker;
+import org.everit.audit.ri.authorization.AuditRiPermissionConstants;
+import org.everit.audit.ri.dto.AuditApplication;
+import org.everit.audit.ri.ecm.AuditRiComponentConstants;
+import org.everit.audit.ri.props.AuditRiPropertyConstants;
+import org.everit.audit.ri.schema.qdsl.QApplication;
+import org.everit.audit.ri.schema.qdsl.QEvent;
+import org.everit.audit.ri.schema.qdsl.QEventData;
+import org.everit.audit.ri.schema.qdsl.QEventType;
+import org.everit.authentication.context.AuthenticationPropagator;
+import org.everit.authnr.permissionchecker.UnauthorizedException;
+import org.everit.authorization.PermissionChecker;
+import org.everit.authorization.ri.schema.qdsl.QPermission;
+import org.everit.authorization.ri.schema.qdsl.QPermissionInheritance;
 import org.everit.osgi.dev.testrunner.TestRunnerConstants;
-import org.everit.osgi.props.PropertyManager;
-import org.everit.osgi.props.ri.schema.qdsl.QProperty;
-import org.everit.osgi.querydsl.support.QuerydslSupport;
-import org.everit.osgi.resource.ResourceService;
-import org.everit.osgi.resource.ri.schema.qdsl.QResource;
+import org.everit.osgi.ecm.annotation.Component;
+import org.everit.osgi.ecm.annotation.ConfigurationPolicy;
+import org.everit.osgi.ecm.annotation.Deactivate;
+import org.everit.osgi.ecm.annotation.Service;
+import org.everit.osgi.ecm.annotation.ServiceRef;
+import org.everit.osgi.ecm.annotation.attribute.StringAttribute;
+import org.everit.osgi.ecm.annotation.attribute.StringAttributes;
+import org.everit.osgi.ecm.component.ComponentContext;
+import org.everit.osgi.ecm.extender.ECMExtenderConstants;
+import org.everit.persistence.querydsl.support.QuerydslSupport;
+import org.everit.props.PropertyManager;
+import org.everit.props.ri.schema.qdsl.QProperty;
+import org.everit.resource.ResourceService;
+import org.everit.resource.ri.schema.qdsl.QResource;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -71,94 +73,66 @@ import com.mysema.query.sql.SQLQuery;
 import com.mysema.query.sql.SQLSubQuery;
 import com.mysema.query.sql.dml.SQLDeleteClause;
 
-@Component(name = "AuditComponentTest", immediate = true, configurationFactory = false,
-    policy = ConfigurationPolicy.OPTIONAL)
-@Properties({
-    @Property(name = TestRunnerConstants.SERVICE_PROPERTY_TESTRUNNER_ENGINE_TYPE, value = "junit4"),
-    @Property(name = TestRunnerConstants.SERVICE_PROPERTY_TEST_ID, value = "auditTest"),
-    @Property(name = "logService.target"),
-    @Property(name = "querydslSupport.target"),
-    @Property(name = "resourceService.target"),
-    @Property(name = "auditEventTypeManager.target"),
-    @Property(name = "loggingService.target"),
-    @Property(name = "auditApplicationCache.target",
-        value = "(service.description=audit-application-cache)"),
-    @Property(name = "auditEventTypeCache.target",
-        value = "(service.description=audit-event-type-cache)"),
-    @Property(name = "auditApplicationManager.target"),
-    @Property(name = "internalAuditEventTypeManager.target"),
-    @Property(name = "internalLoggingService.target"),
-    @Property(name = "auditRiAuthorizationManager.target"),
-    @Property(name = "auditRiPermissionChecker.target"),
-    @Property(name = "permissionChecker.target"),
-    @Property(name = "authenticationPropagator.target"),
-    @Property(name = "propertyManager.target")
-})
+import aQute.bnd.annotation.headers.ProvideCapability;
+
+@Component(configurationPolicy = ConfigurationPolicy.OPTIONAL)
+@ProvideCapability(ns = ECMExtenderConstants.CAPABILITY_NS_COMPONENT,
+    value = ECMExtenderConstants.CAPABILITY_ATTR_CLASS + "=${@class}")
+@StringAttributes({
+    @StringAttribute(attributeId = TestRunnerConstants.SERVICE_PROPERTY_TESTRUNNER_ENGINE_TYPE,
+        defaultValue = "junit4"),
+    @StringAttribute(attributeId = TestRunnerConstants.SERVICE_PROPERTY_TEST_ID,
+        defaultValue = "AuthorizationBasicTest") })
 @Service(AuditComponentTest.class)
 public class AuditComponentTest {
 
-  private static final Instant TIMESTAMP_V = Instant.now();
-
-  private static final double NUMBER_V = 10.75;
-
-  private static final String TIMESTAMP_N = "timestamp";
-
   private static final String NUMBER_N = "number";
 
-  private static final String TEXT_N = "text";
+  private static final double NUMBER_V = 10.75;
 
   private static final String STRING_N = "string";
 
   private static final String STRING_V = "string-value";
 
+  private static final String TEXT_N = "text";
+
   private static final String TEXT_V = "text-value";
 
-  @Reference(bind = "setLogService")
-  private LogService logService;
+  private static final String TIMESTAMP_N = "timestamp";
 
-  @Reference(bind = "setQuerydslSupport")
-  private QuerydslSupport querydslSupport;
+  private static final Instant TIMESTAMP_V = Instant.now();
 
-  @Reference(bind = "setResourceService")
-  private ResourceService resourceService;
-
-  @Reference(bind = "setAuditEventTypeManager")
-  private AuditEventTypeManager auditEventTypeManager; // check
-
-  @Reference(bind = "setLoggingService")
-  private LoggingService loggingService; // check
-
-  @Reference(bind = "setAuditApplicationManager")
-  private AuditApplicationManager auditApplicationManager; // check
-
-  @Reference(bind = "setInternalAuditEventTypeManager")
-  private InternalAuditEventTypeManager internalAuditEventTypeManager; // check
-
-  @Reference(bind = "setInternalLoggingService")
-  private InternalLoggingService internalLoggingService;
-
-  @Reference(bind = "setAuditRiAuthorizationManager")
-  private AuditRiAuthorizationManager auditRiAuthorizationManager; // check
-
-  @Reference(bind = "setAuditRiPermissionChecker")
-  private AuditRiPermissionChecker auditRiPermissionChecker; // check
-
-  @Reference(bind = "setAuditApplicationCache")
   private Map<?, ?> auditApplicationCache;
 
-  @Reference(bind = "setAuditEventTypeCache")
+  private AuditApplicationManager auditApplicationManager; // check
+
   private Map<?, ?> auditEventTypeCache;
 
-  @Reference(bind = "setPermissionChecker")
-  private PermissionChecker permissionChecker;
+  private AuditEventTypeManager auditEventTypeManager; // check
 
-  @Reference(bind = "setAuthenticationPropagator")
+  private AuditRiAuthorizationManager auditRiAuthorizationManager; // check
+
+  private AuditRiPermissionChecker auditRiPermissionChecker; // check
+
   private AuthenticationPropagator authenticationPropagator;
 
-  @Reference(bind = "setPropertyManager")
+  private String embeddedAuditApplicationName;
+
+  private InternalAuditEventTypeManager internalAuditEventTypeManager; // check
+
+  private InternalLoggingService internalLoggingService;
+
+  private LoggingService loggingService; // check
+
+  private LogService logService;
+
+  private PermissionChecker permissionChecker;
+
   private PropertyManager propertyManager;
 
-  private String embeddedAuditApplicationName;
+  private QuerydslSupport querydslSupport;
+
+  private ResourceService resourceService;
 
   @After
   public void after() {
@@ -231,22 +205,22 @@ public class AuditComponentTest {
         String eventDataTypeString = tuple.get(qEventData.eventDataType);
         EventDataType eventDataType = EventDataType.valueOf(eventDataTypeString);
         switch (eventDataType) {
-        case STRING:
-          String stringValue = tuple.get(qEventData.stringValue);
-          rval.add(eventDataBuilder.buildStringValue(stringValue));
-          break;
-        case TEXT:
-          String textValue = tuple.get(qEventData.textValue);
-          rval.add(eventDataBuilder.buildTextValue(false, textValue));
-          break;
-        case NUMBER:
-          double numberValue = tuple.get(qEventData.numberValue);
-          rval.add(eventDataBuilder.buildNumberValue(numberValue));
-          break;
-        case TIMESTAMP:
-          Instant timestampValue = tuple.get(qEventData.timestampValue).toInstant();
-          rval.add(eventDataBuilder.buildTimestampValue(timestampValue));
-          break;
+          case STRING:
+            String stringValue = tuple.get(qEventData.stringValue);
+            rval.add(eventDataBuilder.buildStringValue(stringValue));
+            break;
+          case TEXT:
+            String textValue = tuple.get(qEventData.textValue);
+            rval.add(eventDataBuilder.buildTextValue(false, textValue));
+            break;
+          case NUMBER:
+            double numberValue = tuple.get(qEventData.numberValue);
+            rval.add(eventDataBuilder.buildNumberValue(numberValue));
+            break;
+          case TIMESTAMP:
+            Instant timestampValue = tuple.get(qEventData.timestampValue).toInstant();
+            rval.add(eventDataBuilder.buildTimestampValue(timestampValue));
+            break;
         }
       }
 
@@ -390,67 +364,82 @@ public class AuditComponentTest {
     clearAuditCaches();
   }
 
+  @ServiceRef(defaultValue = "(service.description=audit-application-cache)")
   public void setAuditApplicationCache(final Map<String, AuditApplication> auditApplicationCache) {
     this.auditApplicationCache = auditApplicationCache;
   }
 
+  @ServiceRef(defaultValue = "")
   public void setAuditApplicationManager(final AuditApplicationManager auditApplicationManager) {
     this.auditApplicationManager = auditApplicationManager;
   }
 
+  @ServiceRef(defaultValue = "(service.description=audit-event-type-cache)")
   public void setAuditEventTypeCache(final Map<?, ?> auditEventTypeCache) {
     this.auditEventTypeCache = auditEventTypeCache;
   }
 
-  public void setAuditEventTypeManager(final AuditEventTypeManager auditEventTypeManager,
-      final Map<String, Object> serviceProperties) {
-    this.auditEventTypeManager = auditEventTypeManager;
-    embeddedAuditApplicationName = String.valueOf(
-        serviceProperties.get(AuditRiComponentConstants.PROP_EMBEDDED_AUDIT_APPLICATION_NAME));
+  @ServiceRef(defaultValue = "")
+  public void setAuditEventTypeManager(
+      final ComponentContext<AuditEventTypeManager> auditEventTypeManagerContext) {
+    auditEventTypeManager = auditEventTypeManagerContext.getInstance();
+    embeddedAuditApplicationName = (String) auditEventTypeManagerContext.getProperties().get(
+        AuditRiComponentConstants.ATTR_EMBEDDED_AUDIT_APPLICATION_NAME);
   }
 
+  @ServiceRef(defaultValue = "")
   public void setAuditRiAuthorizationManager(
       final AuditRiAuthorizationManager auditRiAuthorizationManager) {
     this.auditRiAuthorizationManager = auditRiAuthorizationManager;
   }
 
+  @ServiceRef(defaultValue = "")
   public void setAuditRiPermissionChecker(final AuditRiPermissionChecker auditRiPermissionChecker) {
     this.auditRiPermissionChecker = auditRiPermissionChecker;
   }
 
+  @ServiceRef(defaultValue = "")
   public void setAuthenticationPropagator(final AuthenticationPropagator authenticationPropagator) {
     this.authenticationPropagator = authenticationPropagator;
   }
 
+  @ServiceRef(defaultValue = "")
   public void setInternalAuditEventTypeManager(
       final InternalAuditEventTypeManager internalAuditEventTypeManager) {
     this.internalAuditEventTypeManager = internalAuditEventTypeManager;
   }
 
+  @ServiceRef(defaultValue = "")
   public void setInternalLoggingService(final InternalLoggingService internalLoggingService) {
     this.internalLoggingService = internalLoggingService;
   }
 
+  @ServiceRef(defaultValue = "")
   public void setLoggingService(final LoggingService loggingService) {
     this.loggingService = loggingService;
   }
 
+  @ServiceRef(defaultValue = "")
   public void setLogService(final LogService logService) {
     this.logService = logService;
   }
 
+  @ServiceRef(defaultValue = "")
   public void setPermissionChecker(final PermissionChecker permissionChecker) {
     this.permissionChecker = permissionChecker;
   }
 
+  @ServiceRef(defaultValue = "")
   public void setPropertyManager(final PropertyManager propertyManager) {
     this.propertyManager = propertyManager;
   }
 
+  @ServiceRef(defaultValue = "")
   public void setQuerydslSupport(final QuerydslSupport querydslSupport) {
     this.querydslSupport = querydslSupport;
   }
 
+  @ServiceRef(defaultValue = "")
   public void setResourceService(final ResourceService resourceService) {
     this.resourceService = resourceService;
   }
@@ -484,15 +473,15 @@ public class AuditComponentTest {
       Assert.assertTrue(auditRiPermissionChecker.hasPermissionToInitAuditApplication());
 
       // insert and cache
-        auditApplicationManager.initAuditApplication(applicationName);
-        assertAuditApplicationExists(applicationName);
+      auditApplicationManager.initAuditApplication(applicationName);
+      assertAuditApplicationExists(applicationName);
 
-        // load from cache
-        auditApplicationManager.initAuditApplication(applicationName);
-        assertAuditApplicationExists(applicationName);
+      // load from cache
+      auditApplicationManager.initAuditApplication(applicationName);
+      assertAuditApplicationExists(applicationName);
 
-        return null;
-      });
+      return null;
+    });
 
     // remove permission
     auditRiAuthorizationManager.removePermissionInitAuditApplication(authorizedResourceId);
@@ -506,10 +495,10 @@ public class AuditComponentTest {
         auditApplicationManager.initAuditApplication(applicationName);
         Assert.fail();
       } catch (UnauthorizedException e) {
-        Assert.assertEquals(1, e.getActions().length);
-        Assert.assertEquals(AuditRiPermissionConstants.INIT_AUDIT_APPLICATION, e.getActions()[0]);
-        Assert.assertEquals(1, e.getAuthorizationScope().length);
-        Assert.assertEquals(authorizedResourceId, e.getAuthorizationScope()[0]);
+        Assert.assertEquals(1, e.actions.length);
+        Assert.assertEquals(AuditRiPermissionConstants.INIT_AUDIT_APPLICATION, e.actions[0]);
+        Assert.assertEquals(1, e.authorizationScope.length);
+        Assert.assertEquals(authorizedResourceId, e.authorizationScope[0]);
       }
 
       return null;
@@ -608,7 +597,7 @@ public class AuditComponentTest {
           authorizedResourceId, nonExistentApplicationName);
       Assert.fail();
     } catch (UnknownAuditApplicationException e) {
-      Assert.assertEquals(nonExistentApplicationName, e.getApplicationName());
+      Assert.assertEquals(nonExistentApplicationName, e.applicationName);
     }
 
     authenticationPropagator.runAs(authorizedResourceId, () -> {
@@ -617,7 +606,7 @@ public class AuditComponentTest {
         auditRiPermissionChecker.hasPermissionToLogToAuditApplication(nonExistentApplicationName);
         Assert.fail();
       } catch (UnknownAuditApplicationException e) {
-        Assert.assertEquals(nonExistentApplicationName, e.getApplicationName());
+        Assert.assertEquals(nonExistentApplicationName, e.applicationName);
       }
       return null;
     });
@@ -635,19 +624,19 @@ public class AuditComponentTest {
         internalAuditEventTypeManager.initAuditEventTypes(nonExistentApplicationName, "et1");
         Assert.fail();
       } catch (UnknownAuditApplicationException e) {
-        Assert.assertEquals(nonExistentApplicationName, e.getApplicationName());
+        Assert.assertEquals(nonExistentApplicationName, e.applicationName);
       }
 
       // insert and cache
-        internalAuditEventTypeManager.initAuditEventTypes(existentApplicationName, "et1");
-        assertAuditEventTypesExist(existentApplicationName, "et1");
+      internalAuditEventTypeManager.initAuditEventTypes(existentApplicationName, "et1");
+      assertAuditEventTypesExist(existentApplicationName, "et1");
 
-        // load from cache
-        internalAuditEventTypeManager.initAuditEventTypes(existentApplicationName, "et1");
-        assertAuditEventTypesExist(existentApplicationName, "et1");
+      // load from cache
+      internalAuditEventTypeManager.initAuditEventTypes(existentApplicationName, "et1");
+      assertAuditEventTypesExist(existentApplicationName, "et1");
 
-        return null;
-      });
+      return null;
+    });
 
     // remove permission
     auditRiAuthorizationManager.removePermissionLogToAuditApplication(
@@ -664,11 +653,11 @@ public class AuditComponentTest {
             internalAuditEventTypeManager.initAuditEventTypes(existentApplicationName, "et1");
             Assert.fail();
           } catch (UnauthorizedException e) {
-            Assert.assertEquals(1, e.getActions().length);
+            Assert.assertEquals(1, e.actions.length);
             Assert.assertEquals(AuditRiPermissionConstants.LOG_TO_AUDIT_APPLICATION,
-                e.getActions()[0]);
-            Assert.assertEquals(1, e.getAuthorizationScope().length);
-            Assert.assertEquals(authorizedResourceId, e.getAuthorizationScope()[0]);
+                e.actions[0]);
+            Assert.assertEquals(1, e.authorizationScope.length);
+            Assert.assertEquals(authorizedResourceId, e.authorizationScope[0]);
           }
 
           return null;
@@ -735,7 +724,7 @@ public class AuditComponentTest {
         internalLoggingService.logEvent(nonExistentApplicationName, createTestEvent("et0"));
         Assert.fail();
       } catch (UnknownAuditApplicationException e) {
-        Assert.assertEquals(nonExistentApplicationName, e.getApplicationName());
+        Assert.assertEquals(nonExistentApplicationName, e.applicationName);
       }
 
       internalLoggingService.logEvent(existentApplicationName, createTestEvent("et0"));
@@ -756,11 +745,11 @@ public class AuditComponentTest {
             internalLoggingService.logEvent(existentApplicationName, createTestEvent("et0"));
             Assert.fail();
           } catch (UnauthorizedException e) {
-            Assert.assertEquals(1, e.getActions().length);
+            Assert.assertEquals(1, e.actions.length);
             Assert.assertEquals(AuditRiPermissionConstants.LOG_TO_AUDIT_APPLICATION,
-                e.getActions()[0]);
-            Assert.assertEquals(1, e.getAuthorizationScope().length);
-            Assert.assertEquals(authorizedResourceId, e.getAuthorizationScope()[0]);
+                e.actions[0]);
+            Assert.assertEquals(1, e.authorizationScope.length);
+            Assert.assertEquals(authorizedResourceId, e.authorizationScope[0]);
           }
 
           return null;
