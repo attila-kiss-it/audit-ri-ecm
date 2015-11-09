@@ -20,8 +20,8 @@
   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.0.xsd
         http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
 
-  <include file="eosgi:org.everit.audit.ri" />
-  <include file="eosgi:org.everit.authorization.ri" />
-  <include file="eosgi:org.everit.props.ri" />
+  <include file="org.everit.audit.ri.eosgi" />
+  <include file="org.everit.authorization.ri.eosgi" />
+  <include file="org.everit.props.ri.eosgi" />
 
 </databaseChangeLog>

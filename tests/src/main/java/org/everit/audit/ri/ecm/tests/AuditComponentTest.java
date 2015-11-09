@@ -69,10 +69,10 @@ import org.junit.Before;
 import org.junit.Test;
 import org.osgi.service.log.LogService;
 
-import com.mysema.query.Tuple;
-import com.mysema.query.sql.SQLQuery;
-import com.mysema.query.sql.SQLSubQuery;
-import com.mysema.query.sql.dml.SQLDeleteClause;
+import com.querydsl.core.Tuple;
+import com.querydsl.sql.SQLExpressions;
+import com.querydsl.sql.SQLQuery;
+import com.querydsl.sql.dml.SQLDeleteClause;
 
 import aQute.bnd.annotation.headers.ProvideCapability;
 
@@ -169,11 +169,11 @@ public class AuditComponentTest {
 
       QApplication qApplication = QApplication.application;
 
-      return new SQLQuery(connection, configuration)
+      return new SQLQuery<String>(connection, configuration)
+          .select(qApplication.applicationName)
           .from(qApplication)
           .where(qApplication.applicationName.eq(expectedApplicationName))
-          .uniqueResult(qApplication.applicationName);
-
+          .fetchFirst();
     });
 
     Assert.assertEquals(expectedApplicationName, actualApplicationName);
@@ -187,13 +187,13 @@ public class AuditComponentTest {
       QEventType qEventType = QEventType.eventType;
       QApplication qApplication = QApplication.application;
 
-      return new SQLQuery(connection, configuration)
+      return new SQLQuery<String>(connection, configuration)
+          .select(qEventType.eventTypeName)
           .from(qEventType)
           .innerJoin(qApplication).on(qApplication.applicationId.eq(qEventType.applicationId))
           .where(qEventType.eventTypeName.in(expectedEventTypeNames)
               .and(qApplication.applicationName.eq(applicationName)))
-          .list(qEventType.eventTypeName);
-
+          .fetch();
     });
 
     Assert.assertArrayEquals(expectedEventTypeNames,
@@ -207,7 +207,13 @@ public class AuditComponentTest {
       QEventType qEventType = QEventType.eventType;
       QEventData qEventData = QEventData.eventData;
 
-      List<Tuple> tuples = new SQLQuery(connection, configuration)
+      List<Tuple> tuples = new SQLQuery<Tuple>(connection, configuration)
+          .select(qEventData.eventDataName,
+              qEventData.eventDataType,
+              qEventData.stringValue,
+              qEventData.textValue,
+              qEventData.numberValue,
+              qEventData.timestampValue)
           .from(qEvent)
           .innerJoin(qEventType)
           .on(qEventType.eventTypeId.eq(qEvent.eventTypeId))
@@ -215,11 +221,7 @@ public class AuditComponentTest {
           .on(qEventData.eventId.eq(qEvent.eventId))
           .where(qEventType.eventTypeName.eq(eventTypeName))
           .orderBy(qEventData.eventDataId.asc())
-          .list(qEventData.eventDataName, qEventData.eventDataType,
-              qEventData.stringValue,
-              qEventData.textValue,
-              qEventData.numberValue,
-              qEventData.timestampValue);
+          .fetch();
 
       List<EventData> rval = new ArrayList<>();
       for (Tuple tuple : tuples) {
@@ -287,7 +289,7 @@ public class AuditComponentTest {
       QApplication qApplication = QApplication.application;
 
       new SQLDeleteClause(connection, configuration, qEventData)
-          .where(new SQLSubQuery()
+          .where(SQLExpressions.select(qApplication.applicationId)
               .from(qApplication)
               .innerJoin(qEventType).on(qEventType.applicationId.eq(qApplication.applicationId))
               .innerJoin(qEvent).on(qEventType.eventTypeId.eq(qEvent.eventTypeId))
@@ -297,7 +299,7 @@ public class AuditComponentTest {
           .execute();
 
       new SQLDeleteClause(connection, configuration, qEvent)
-          .where(new SQLSubQuery()
+          .where(SQLExpressions.select(qApplication.applicationId)
               .from(qApplication)
               .innerJoin(qEventType).on(qEventType.applicationId.eq(qApplication.applicationId))
               .where(qApplication.applicationName.eq(applicationName)
@@ -306,7 +308,7 @@ public class AuditComponentTest {
           .execute();
 
       new SQLDeleteClause(connection, configuration, qEventType)
-          .where(new SQLSubQuery()
+          .where(SQLExpressions.select(qApplication.applicationId)
               .from(qApplication)
               .where(qApplication.applicationId.eq(qEventType.applicationId)
                   .and(qApplication.applicationName.eq(applicationName)))
@@ -334,7 +336,7 @@ public class AuditComponentTest {
       QEventType qEventType = QEventType.eventType;
 
       new SQLDeleteClause(connection, configuration, qEventData)
-          .where(new SQLSubQuery()
+          .where(SQLExpressions.select(qEventType.eventTypeId)
               .from(qEventType)
               .innerJoin(qEvent).on(qEventType.eventTypeId.eq(qEvent.eventTypeId))
               .where(qEventType.eventTypeName.eq(eventTypeName)
