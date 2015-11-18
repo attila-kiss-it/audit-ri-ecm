@@ -173,7 +173,7 @@ public class AuditComponentTest {
           .select(qApplication.applicationName)
           .from(qApplication)
           .where(qApplication.applicationName.eq(expectedApplicationName))
-          .fetchFirst();
+          .fetchOne();
     });
 
     Assert.assertEquals(expectedApplicationName, actualApplicationName);
